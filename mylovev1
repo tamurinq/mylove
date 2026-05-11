@@ -1,0 +1,173 @@
+import asyncio
+import random
+import aiosqlite
+
+from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+
+TOKEN = "8747416758:AAGGf1VM_zHug4TGAA_iLUYsX3ta-PdSZqU"
+
+bot = Bot(
+    token=TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
+dp = Dispatcher()
+
+# ---------------- GIF ---------------- #
+
+kiss_gifs = [
+    "https://media.tenor.com/UWb6KpBA9MIAAAAC/anime-kiss.gif",
+    "https://media.tenor.com/6lzK6YpW4N8AAAAC/anime-kiss.gif",
+]
+
+hug_gifs = [
+    "https://media.tenor.com/3wEJ1rJ0Y4QAAAAC/anime-hug.gif",
+    "https://media.tenor.com/fm49srQnsxYAAAAC/anime-hug.gif",
+]
+
+slap_gifs = [
+    "https://media.tenor.com/VJzYB-0w4iMAAAAC/anime-slap.gif",
+    "https://media.tenor.com/qTYg5uU9mHcAAAAC/anime-hit.gif",
+]
+
+# ---------------- DATABASE ---------------- #
+
+async def db_start():
+    async with aiosqlite.connect("relations.db") as db:
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS marriages (
+            user1 INTEGER,
+            user2 INTEGER
+        )
+        """)
+        await db.commit()
+
+# ---------------- RELATIONS ---------------- #
+
+@dp.message()
+async def commands(message: types.Message):
+
+    if not message.text:
+        return
+
+    text = message.text.lower()
+
+    # ---------- ПОЦЕЛУЙ ---------- #
+
+    if text.startswith(".отн поцеловать"):
+
+        if not message.reply_to_message:
+            await message.reply("Ответь на сообщение человека 💋")
+            return
+
+        author = message.from_user.first_name
+        target = message.reply_to_message.from_user.first_name
+
+        gif = random.choice(kiss_gifs)
+
+        await message.answer_animation(
+            animation=gif,
+            caption=f"💋 <b>{author}</b> поцеловал(а) <b>{target}</b>"
+        )
+
+    # ---------- ОБНЯТЬ ---------- #
+
+    elif text.startswith(".отн обнять"):
+
+        if not message.reply_to_message:
+            await message.reply("Ответь на сообщение человека 🤗")
+            return
+
+        author = message.from_user.first_name
+        target = message.reply_to_message.from_user.first_name
+
+        gif = random.choice(hug_gifs)
+
+        await message.answer_animation(
+            animation=gif,
+            caption=f"🤗 <b>{author}</b> обнял(а) <b>{target}</b>"
+        )
+
+    # ---------- УДАРИТЬ ---------- #
+
+    elif text.startswith(".отн ударить"):
+
+        if not message.reply_to_message:
+            await message.reply("Ответь на сообщение человека 👊")
+            return
+
+        author = message.from_user.first_name
+        target = message.reply_to_message.from_user.first_name
+
+        gif = random.choice(slap_gifs)
+
+        await message.answer_animation(
+            animation=gif,
+            caption=f"👊 <b>{author}</b> ударил(а) <b>{target}</b>"
+        )
+
+    # ---------- БРАК ---------- #
+
+    elif text.startswith(".брак"):
+
+        if not message.reply_to_message:
+            await message.reply("Ответь на сообщение человека 💍")
+            return
+
+        user1 = message.from_user.id
+        user2 = message.reply_to_message.from_user.id
+
+        name1 = message.from_user.first_name
+        name2 = message.reply_to_message.from_user.first_name
+
+        async with aiosqlite.connect("relations.db") as db:
+
+            cursor = await db.execute("""
+            SELECT * FROM marriages
+            WHERE user1=? OR user2=? OR user1=? OR user2=?
+            """, (user1, user1, user2, user2))
+
+            exists = await cursor.fetchone()
+
+            if exists:
+                await message.reply("❌ Кто-то уже состоит в браке")
+                return
+
+            await db.execute(
+                "INSERT INTO marriages VALUES (?, ?)",
+                (user1, user2)
+            )
+
+            await db.commit()
+
+        await message.answer(
+            f"💍 <b>{name1}</b> и <b>{name2}</b> теперь в браке!"
+        )
+
+    # ---------- РАЗВОД ---------- #
+
+    elif text.startswith(".развод"):
+
+        user = message.from_user.id
+
+        async with aiosqlite.connect("relations.db") as db:
+
+            await db.execute("""
+            DELETE FROM marriages
+            WHERE user1=? OR user2=?
+            """, (user, user))
+
+            await db.commit()
+
+        await message.answer("💔 Брак расторгнут")
+
+# ---------------- START ---------------- #
+
+async def main():
+    await db_start()
+    print("Бот запущен")
+    await dp.start_polling(bot)
+
+asyncio.run(main())
