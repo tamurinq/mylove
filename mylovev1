@@ -172,3 +172,4 @@ async def main():
 
 asyncio.run(main())
 python bot.py
+cd C:\telegram_bot
